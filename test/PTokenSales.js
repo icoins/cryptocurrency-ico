@@ -99,6 +99,184 @@ contract('PTokenSales', function(accounts){
         })
     });
 
+
+    it("Mint Token by 200,000.", function(){
+        let contractAddr;
+        return PTokenSales.deployed().then(function(instance){
+            tokenInstance = instance;
+            return tokenInstance.address;
+        }).then(function(addr){
+            contractAddr = addr;
+            return tokenInstance.balanceOf(contractAddr);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 0, "Correct contract balance");
+            return tokenInstance.totalSupply()
+        }).then(function(totalSupply) {
+            assert.equal(totalSupply.toNumber(), 100000, "Correct total supply check.");
+            return tokenInstance.mintToken(contractAddr, 200000, {from: accounts[1]})
+        }).then(function(receipt){
+            assert.equal(receipt.logs.length, 2, 'triggers two event');
+            assert.equal(receipt.logs[0].event, 'Transfer', 'should be the "Transfer" event');
+            assert.equal(receipt.logs[1].event, 'Transfer', 'should be the "Transfer" event');
+            return tokenInstance.address;
+        }).then(function(addr){
+            assert.equal(addr, contractAddr, 'Still in the same contract');
+            return tokenInstance.balanceOf(contractAddr);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 200000, "Correct contract balance");
+            return tokenInstance.totalSupply()
+        }).then(function(totalSupply) {
+            assert.equal(totalSupply.toNumber(), 300000, "Correct total supply check.");
+        })
+
+    });
+
+    it("Set Sell & Buy Price.", function(){
+        return PTokenSales.deployed().then(function(instance){
+            tokenInstance = instance;
+            return tokenInstance.sellPrice();
+        }).then(function(sellPrice){
+            assert.equal(sellPrice.toNumber(), 0, "Sell Price Before Checked.");
+            return tokenInstance.buyPrice();
+        }).then(function(buyPrice){
+            assert.equal(buyPrice.toNumber(), 0, "Buy Price Before Checked.");
+            tokenInstance.setPrices(1, 2, {from: accounts[1]});
+            return tokenInstance.sellPrice();
+        }).then(function(sellPrice){
+            assert.equal(sellPrice.toNumber(), 1, "Sell Price After Checked.");
+            return tokenInstance.buyPrice();
+        }).then(function(buyPrice){
+            assert.equal(buyPrice.toNumber(), 2, "Buy Price After Checked.");
+            //tokenInstance.setPrices(1, 2, {from: accounts[1]});
+        })
+
+    });
+
+
+    it("Approve to spend.", function(){
+        return PTokenSales.deployed().then(function(instance){
+            tokenInstance = instance;
+            return tokenInstance.balanceOf(accounts[0]);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 250, "Creator/Account[0] has 250 tokens.");
+            tokenInstance.approve(accounts[2], 100, {from: accounts[0]});
+            return tokenInstance.allowance(accounts[0], accounts[2]);
+        }).then(function(reply){
+            assert.equal(reply.toNumber(), 100, "Creator has approved account[2] to spend 100 tokens on his behalf.");
+            return tokenInstance.balanceOf(accounts[2]);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 0, "Account[2] has Zero balance");
+            return tokenInstance.transfer(accounts[3], 100, { from: accounts[2] });
+        }).then(function(receipt){
+            assert.equal(receipt.logs.length, 1, 'triggers one event');
+            assert.equal(receipt.logs[0].event, 'Transfer', 'should be the "Transfer" event');
+            assert.equal(receipt.logs[0].args.from, accounts[2], 'logs the account that purchased the tokens');
+            assert.equal(receipt.logs[0].args.to, accounts[3], 'logs the number of tokens purchased');
+            assert.equal(receipt.logs[0].args.value.toNumber(), 100, 'value of the transfer');
+            return tokenInstance.balanceOf(accounts[0]);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 150, "Creator/Account[0] has 150 tokens.");
+            return tokenInstance.balanceOf(accounts[3]);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 100, "Account[3] has 100 tokens.");
+            return tokenInstance.transfer(accounts[3], 100, { from: accounts[2] });
+        }).then(assert.fail).catch(function(error) {
+            assert(error.message.indexOf('revert') >= 0, 'error when Account[2] tring to transfer more then alloted.');
+        })
+    });
+
+
+
+    it("Sell & Buy ether.", function(){
+
+        let contractAddr;
+        const buyAccount = accounts[3];
+
+        return PTokenSales.deployed().then(function(instance){
+            tokenInstance = instance;
+            return tokenInstance.address;
+        }).then(function(addr){
+            contractAddr = addr;
+            return tokenInstance.balanceOf(accounts[0]);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 250, "Creator Account has 250 tokens.");
+            return tokenInstance.balanceOf(buyAccount);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 0, "buyAccount has 0 tokens.");
+            return tokenInstance.transfer(buyAccount, 100, {from:accounts[0]});
+        }).then(function(receipt){
+            return tokenInstance.balanceOf(buyAccount);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 100, "buyAccount has 100 tokens.");
+            return tokenInstance.buy({ from: buyAccount, value: 10 });
+        }).then(function(receipt){
+            
+            //console.log(receipt.logs[0].args.value.toNumber());
+            assert.equal(receipt.logs.length, 1, 'triggers one event');
+            assert.equal(receipt.logs[0].event, 'Transfer', 'should be the "Transfer" event');
+            assert.equal(receipt.logs[0].args.from, contractAddr, 'logs the account that purchased the tokens');
+            assert.equal(receipt.logs[0].args.to, buyAccount, 'logs the number of tokens purchased');
+            //assert.equal(receipt.logs[0].args.value.toNumber(), 100, 'value of the transfer');
+            return tokenInstance.balanceOf(buyAccount);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 100, "buyAccount has 100 tokens.");
+            return tokenInstance.balanceOf(contractAddr);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 200000, "Contract Account has 200,000 tokens.");
+            return tokenInstance.sell(1, { from: buyAccount });
+        }).then(function(receipt){
+            
+            //console.log(receipt);
+            //assert.equal(receipt.status, '0x01', 'triggers one event');
+            //assert.equal(receipt.logs[0].event, 'Transfer', 'should be the "Transfer" event');
+            //assert.equal(receipt.logs[0].args.from, contractAddr, 'logs the account that purchased the tokens');
+            //assert.equal(receipt.logs[0].args.to, buyAccount, 'logs the number of tokens purchased');
+            //assert.equal(receipt.logs[0].args.value.toNumber(), 100, 'value of the transfer');
+            return tokenInstance.balanceOf(buyAccount);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 99, "buyAccount has 99 tokens.");
+            return tokenInstance.balanceOf(contractAddr);
+        }).then(function(balance){
+            assert.equal(balance.toNumber(), 200001, "Contract Account has 200,001 tokens.");
+        })
+    });
+
+
+    it("Freeze Account.", function(){
+
+        return PTokenSales.deployed().then(function(instance){
+            tokenInstance = instance;
+            return tokenInstance.freezeAccount(accounts[3], true, {from:accounts[2]});
+        }).then(assert.fail).catch(function(error) {
+            return tokenInstance.freezeAccount(accounts[3], true, {from:accounts[1]});
+        }).then(function(receipt){
+            assert.equal(receipt.logs.length, 1, 'triggers one event');
+            assert.equal(receipt.logs[0].event, 'FrozenFund', 'should be the "FrozenFund" event');
+            assert.equal(receipt.logs[0].args.target, accounts[3], 'account froozen');
+            assert.equal(receipt.logs[0].args.frozen, true, 'account froozen status');
+
+            return tokenInstance.frozenAccount(accounts[3]);
+            
+        }).then(function(status){
+            assert.equal(status, true, 'account froozen status is true');
+        }).then(function(){
+            return tokenInstance.freezeAccount(accounts[3], false, {from:accounts[1]});
+        }).then(function(receipt){
+            assert.equal(receipt.logs.length, 1, 'triggers one event');
+            assert.equal(receipt.logs[0].event, 'FrozenFund', 'should be the "FrozenFund" event');
+            assert.equal(receipt.logs[0].args.target, accounts[3], 'account froozen');
+            assert.equal(receipt.logs[0].args.frozen, false, 'account froozen status');
+
+            return tokenInstance.frozenAccount(accounts[3]);
+            
+        }).then(function(status){
+            assert.equal(status, false, 'account froozen status is false');
+        })
+
+    });
+
+
 })
 
 //.then(function(){})
+//.then(assert.fail).catch(function(error) {})

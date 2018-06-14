@@ -8,7 +8,7 @@ contract admined {
     }
 
     modifier onlyAdmin(){
-        require (msg.sender != admin);
+        require (msg.sender == admin);
         _;
     }
 
@@ -50,6 +50,7 @@ contract PaCoin {
     }
 
     function approve(address _spender, uint256 _value) public returns (bool success){
+        // *** CHECK IF MSG.SENDER HAS THAT MUCH VALUE OF COINS BEFORE APPROVING
         allowance[msg.sender][_spender] = _value;
         return true;
     }
@@ -132,14 +133,14 @@ contract PTokenSales is admined, PaCoin{
 
     function buy() payable public {
         uint256 amount = (msg.value/(1 ether)) / buyPrice;
-        require(balanceOf[this] < amount);
+        require(balanceOf[this] >= amount);
         balanceOf[msg.sender] += amount;
         balanceOf[this] -= amount;
         emit Transfer(this, msg.sender, amount);
     }
 
     function sell(uint256 amount) public {
-        require(balanceOf[msg.sender] < amount);
+        require(balanceOf[msg.sender] >= amount);
         balanceOf[this] += amount;
         balanceOf[msg.sender] -= amount;
         if(msg.sender.send(amount * sellPrice * 1 ether)){
