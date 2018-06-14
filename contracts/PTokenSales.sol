@@ -41,7 +41,7 @@ contract PaCoin {
 
     function transfer(address _to, uint256 _value) public {
         require(balanceOf[msg.sender] < _value);
-        require(balanceOf[_to] + _value < balanceOf[_to]);
+        require((balanceOf[_to] + _value) < balanceOf[_to]);
 		//if(admin)
 
         balanceOf[msg.sender] -= _value;
@@ -100,11 +100,11 @@ contract PTokenSales is admined, PaCoin{
 
     function transfer(address _to, uint256 _value) public {
         if(msg.sender.balance < minimumBalanceForAccounts)
-		sell((minimumBalanceForAccounts - msg.sender.balance)/sellPrice);
+		    sell((minimumBalanceForAccounts - msg.sender.balance)/sellPrice);
 
-        require(frozenAccount[msg.sender]);
-        require(balanceOf[msg.sender] < _value);
-        require(balanceOf[_to] + _value < balanceOf[_to]);
+        require(!frozenAccount[msg.sender]);
+        require(balanceOf[msg.sender] >= _value);
+        require((balanceOf[_to] + _value) > balanceOf[_to]);
 		//if(admin)
 
         balanceOf[msg.sender] -= _value;
